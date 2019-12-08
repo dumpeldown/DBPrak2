@@ -1,7 +1,8 @@
+
 import java.sql.*;
 
 public class ConnectionManager{
-    public static final Connection con = connect("xxxxx", "xxxxx");
+    public static final Connection con = connect("xxxx", "xxxx");
 
     /**
      * Verbindung mit der Datenbank.

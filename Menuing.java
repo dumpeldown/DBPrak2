@@ -43,6 +43,10 @@ public class Menuing{
                     Bestellsystem.addNewBestellung();
                     break;
                 }
+                case 9:{
+                    Versandplanung.plan();
+                    break;
+                }
                 case 0:{
                     System.out.println("Programm wird beendet.");
                     ConnectionManager.closeConnection();
@@ -63,6 +67,7 @@ public class Menuing{
                 "6) UPDATE: Fuer eine ArtNr. den Wert (STUECKE*PREIS) eintragen.\n" +
                 "7) Fuer eine ArtNr. den Artikel anzeigen und seine Lagerbestaende.\n" +
                 "8) Eine neue Bestellung ins System aufnehmen.\n" +
-                "0) Verbindung trennen und Program schliessen.");
+                "9) Prak3: Versandplanung starten!\n"+
+                "0) Verbindung trennen und Program schließen.");
     }
 }

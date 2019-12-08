@@ -87,7 +87,8 @@ public class SQLManager{
         }catch(SQLException e){
             e.printStackTrace();
         }
-        System.out.println("[!]Erfolgreich "+ updated+" Kundendatensaetze in die Datenbank geschrieben!\n");
+        if((updated-notFully) < 0) updated = 0; else updated -= notFully;
+        System.out.println("[!]Erfolgreich "+ updated+" Kundendatensätze in die Datenbank geschrieben!\n");
     }
 
     /**
@@ -194,7 +195,7 @@ public class SQLManager{
             stmt = ConnectionManager.con.createStatement();
             rs = stmt.executeQuery(SQL);
             if (!rs.isBeforeFirst() ) {
-                System.out.println("Keine Daten fuer die Lagernummer gefunden.");
+                System.out.println("Keine Daten für die Lagernummer gefunden.");
             }
             while(rs.next()){
                 int artnr = rs.getInt("artnr");
@@ -202,7 +203,7 @@ public class SQLManager{
                 int bstnr = rs.getInt("bstnr");
 
                 System.out.println("Artikelnr.:"+artnr);
-                System.out.println("Anzahl der Bestaende: "+stuecke+" mit Bestandsnummer "+ bstnr+".");
+                System.out.println("Anzahl der Bestände: "+stuecke+" mit Bestandsnummer "+ bstnr+".");
                 System.out.println("-----------------------");
             }
             System.out.println("\n");
@@ -258,7 +259,7 @@ public class SQLManager{
             return;
         }
         if(!isValid("artikel", "artnr", toGet)){
-            System.out.println("\n[!!]Die Artikelnummer ist nicht gueltig.\n");
+            System.out.println("\n[!!]Die Artikelnummer ist nicht gültig.\n");
             return;
         }
         String SQL = "select artikel.*, lagerbestand.* from artikel, lagerbestand where artikel.artnr = lagerbestand" +
@@ -298,7 +299,30 @@ public class SQLManager{
             e.printStackTrace();
         }
     }
-
+    public static String getArtikel(int artnr){
+        Statement stmt;
+        ResultSet rs = null;
+        int i = 0;
+        String SQL = "select * from artikel where artnr ="+artnr+";";
+        try{
+            stmt = ConnectionManager.con.createStatement();
+            rs = stmt.executeQuery(SQL);
+        }catch(SQLException e){
+            e.printStackTrace();
+        }
+        try{
+            if(!rs.isBeforeFirst()){
+                System.out.println("\n[!!!]Keinen Artikel mit Artikelnummer "+artnr+" gefunden.");
+            }
+            System.out.println("\nGefundene Artikel mit Artnummer "+artnr+":");
+            while(rs.next()){
+                return rs.getString("artbez");
+            }
+        }catch(SQLException e){
+            e.printStackTrace();
+        }
+        return "fail";
+    }
     public static void writeBestellug(int knr, Datum dat){
         String SQL;
         PreparedStatement pstmt = null;
@@ -320,6 +344,7 @@ public class SQLManager{
         }catch(SQLException e){
             System.out.println("[!!] Fehler beim Schreiben: "+e.getMessage());
         }
+        System.out.println("bestellung in bestellung eingetragen.");
     }
 
     public static int checkAnzahlStuecke(int artnr, int eStuecke){
@@ -370,7 +395,7 @@ public class SQLManager{
         }catch(SQLException e){
             e.printStackTrace();
         }
-        //System.out.println("zeile zum kopieren geholt, bstnr: "+bstnr);
+        System.out.println("zeile zum kopieren geholt, bstnr: "+bstnr);
 
         SQL = "Insert into lagerbestand(artnr, lnr, stuecke, wert, bestnr) values(?,?,?, ?, ?);";
         try{
@@ -386,7 +411,7 @@ public class SQLManager{
         }catch(SQLException e){
             e.printStackTrace();
         }
-        //System.out.println("zeile eingefügt mit neuer bstnummer und allen selben werten.");
+        System.out.println("zeile eingefügt mit neuer bstnummer und allen selben werten.");
     }
 
     public static void writeUpdateOnLagerbestand(int bestnr, int eStuecke, int bstnr){
@@ -399,9 +424,63 @@ public class SQLManager{
         }catch(SQLException e){
             e.printStackTrace();
         }
-       if(succ < 0){
+        if(succ > 0) System.out.println("Update auf alte zeile geschrieben, mit bst= "+bstnr+" und jetzt eingetragen " +
+                "bestnr = "+bestnr);
+        else{
             System.out.println("Fehler beim Schreiben der Bestellung.");
-	   }
+        }
 
+    }
+
+    public static void printAllBestellungen(){
+        Statement stmt;
+        ResultSet rs = null;
+        int i = 0;
+        String SQL = "select * from bestellung where status = 1;";
+        try{
+            stmt = ConnectionManager.con.createStatement();
+            rs = stmt.executeQuery(SQL);
+        }catch(SQLException e){
+            e.printStackTrace();
+        }
+        try{
+            if(!rs.isBeforeFirst()){
+                System.out.println("\n[!!!]Keine Bestellung mit Status = 1 gefunden.");
+            }
+            System.out.println("\nAlle Bestellungen mit Status = 1:");
+            while(rs.next()){
+                System.out.println("\nIndex: "+i+" Bestellnummer: "+rs.getInt("bestnr")+", Bestelldatum: "+rs.getDate(
+                        "bestdat")+
+                        " Kundenummer: "+rs.getInt("knr"));
+                i++;
+            }
+        }catch(SQLException e){
+            e.printStackTrace();
+        }
+    }
+
+    public static ArrayList<int[]> getBestellung(int bestnr){
+        Statement stmt;
+        ResultSet rs = null;
+        ArrayList<int[]> bestellungen = new ArrayList<>();
+        String SQL = "select * from lagerbestand where bestnr ="+bestnr+";";
+        try{
+            stmt = ConnectionManager.con.createStatement();
+            rs = stmt.executeQuery(SQL);
+        }catch(SQLException e){
+            e.printStackTrace();
+        }
+        try{
+            if(!rs.isBeforeFirst()){
+                System.out.println("\n[!!!]Keine Bestellung mit der Bestellnummer+"+bestnr+" gefunden.");
+            }
+            System.out.println("\nGefundene Bestellung mit bestellnummer "+bestnr+":");
+            while(rs.next()){
+                bestellungen.add(new int[]{rs.getInt("artnr"), rs.getInt("bstnr"), rs.getInt("stuecke")});
+            }
+        }catch(SQLException e){
+            e.printStackTrace();
+        }
+        return bestellungen;
     }
 }
