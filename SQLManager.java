@@ -299,10 +299,9 @@ public class SQLManager{
             e.printStackTrace();
         }
     }
-    public static String getArtikel(int artnr){
+    public static String getArtikelBez(int artnr){
         Statement stmt;
         ResultSet rs = null;
-        int i = 0;
         String SQL = "select * from artikel where artnr ="+artnr+";";
         try{
             stmt = ConnectionManager.con.createStatement();
@@ -314,7 +313,7 @@ public class SQLManager{
             if(!rs.isBeforeFirst()){
                 System.out.println("\n[!!!]Keinen Artikel mit Artikelnummer "+artnr+" gefunden.");
             }
-            System.out.println("\nGefundene Artikel mit Artnummer "+artnr+":");
+            System.out.println("\nArtikel mit Artnummer "+artnr+" gefunden.");
             while(rs.next()){
                 return rs.getString("artbez");
             }
@@ -323,11 +322,36 @@ public class SQLManager{
         }
         return "fail";
     }
+
+    public static int getArtikelAnzbox(int artnr){
+        Statement stmt;
+        ResultSet rs = null;
+        String SQL = "select * from artikel where artnr ="+artnr+";";
+        try{
+            stmt = ConnectionManager.con.createStatement();
+            rs = stmt.executeQuery(SQL);
+        }catch(SQLException e){
+            e.printStackTrace();
+        }
+        try{
+            if(!rs.isBeforeFirst()){
+                System.out.println("\n[!!!]Keinen Artikel mit Artikelnummer "+artnr+" gefunden.");
+            }
+            System.out.println("\nArtikel mit Artnummer "+artnr+" gefunden.");
+            while(rs.next()){
+                int anzbo = rs.getInt("anzbo");
+                System.out.println("Anzbo für Artikel ("+artnr+") = "+anzbo);
+                return anzbo;
+            }
+        }catch(SQLException e){
+            e.printStackTrace();
+        }
+        return -1;
+    }
+
     public static void writeBestellug(int knr, Datum dat){
         String SQL;
         PreparedStatement pstmt = null;
-        Statement stmt = null;
-        ResultSet rs;
         SQL = "Insert into bestellung(knr, bestdat, status) values(?,?,1);";
         try{
             pstmt = ConnectionManager.con.prepareStatement(SQL, Statement.RETURN_GENERATED_KEYS);
@@ -379,7 +403,7 @@ public class SQLManager{
         PreparedStatement pstmt;
         Statement stmt;
         ResultSet rs;
-        int artnr = 0, lnr = 0, bestnr = 0, stuecke = 0;
+        int artnr = 0, lnr = 0, stuecke = 0;
         double wert = 0;
         SQL = "Select * from lagerbestand where bstnr="+bstnr;
         try{
@@ -449,7 +473,7 @@ public class SQLManager{
             }
             System.out.println("\nAlle Bestellungen mit Status = 1:");
             while(rs.next()){
-                System.out.println("\nIndex: "+i+" Bestellnummer: "+rs.getInt("bestnr")+", Bestelldatum: "+rs.getDate(
+                System.out.println("\nBestellnummer: "+rs.getInt("bestnr")+", Bestelldatum: "+rs.getDate(
                         "bestdat")+
                         " Kundenummer: "+rs.getInt("knr"));
                 i++;
@@ -483,4 +507,126 @@ public class SQLManager{
         }
         return bestellungen;
     }
+
+    public static String getVersandTyp(int bestnr){
+        Statement stmt;
+        ResultSet rs = null;
+        String SQL = "select * from box where vbstnr ="+bestnr+";";
+        try{
+            stmt = ConnectionManager.con.createStatement();
+            rs = stmt.executeQuery(SQL);
+        }catch(SQLException e){
+            e.printStackTrace();
+        }
+        try{
+            if(!rs.isBeforeFirst()){
+                System.out.println("\n[!!!]Kein Ergebnis in box fuer bestnr/vbstnr+"+bestnr+" gefunden.");
+            }
+            System.out.println("\nBestellung mit bestellnummer "+bestnr+" gefunden.");
+            while(rs.next()){
+                return rs.getString("vbtyp");
+            }
+        }catch(SQLException e){
+            e.printStackTrace();
+        }
+        return "fail";
+    }
+
+    public static ArrayList<FreieBox> getFreieBoxen(){
+        Statement stmt;
+        ResultSet rs = null;
+        ArrayList<FreieBox> freieBoxen = new ArrayList<>();
+        String SQL = "select * from box where vstat = 0";
+        try{
+            stmt = ConnectionManager.con.createStatement();
+            rs = stmt.executeQuery(SQL);
+        }catch(SQLException e){
+            e.printStackTrace();
+        }
+        try{
+            if(!rs.isBeforeFirst()){
+                System.out.println("\n[!!!]Keine freien Boxen gefunden.");
+            }
+            System.out.println("\nFreie Boxen gefunden, gespeichert in Arraylist.");
+            while(rs.next()){
+                freieBoxen.add(new FreieBox(rs.getString("vbtyp"), rs.getInt("vbnr")));
+            }
+        }catch(SQLException e){
+            e.printStackTrace();
+        }
+        System.out.println("Anzahl der Freien Boxen:"+freieBoxen.size());
+        return freieBoxen;
+    }
+
+    public static void writePackliste(ArrayList<Packelement> packliste){
+        String SQL;
+        PreparedStatement pstmt = null;
+        int lagerbestand_bstnr, vmenge, box_bstnr;
+        for(Packelement el : packliste){
+            SQL = "Insert into lpos2box(bstnr, vmenge, vbnr) values(?,?,?);";
+            try{
+                pstmt = ConnectionManager.con.prepareStatement(SQL, Statement.RETURN_GENERATED_KEYS);
+            }catch(SQLException e){
+                e.printStackTrace();
+            }
+            lagerbestand_bstnr = el.lagerbestand_bstnr;
+            vmenge = el.vmenge;
+            box_bstnr = el.box_vbnr;
+            try{
+                //fragezeichen aus pstmt ersetzen.
+                pstmt.setInt(1, lagerbestand_bstnr);
+                pstmt.setInt(2, vmenge);
+                pstmt.setInt(3, box_bstnr);
+                int temp = pstmt.executeUpdate();
+                if(temp > 0){
+                    System.out.println("erfolgreich eine zeile in lpos2box geschrieben.");
+                }
+            }catch(SQLException e){
+
+                System.out.println("[!!] Fehler beim Schreiben: " + e.getMessage());
+            }
+        }
+    }
+
+    public static void updateStatusOnBestellung(int bestnr){
+        Statement stmt;
+
+        String SQL = "update bestellung set status = 2 where bestnr ="+bestnr;
+        try{
+            stmt = ConnectionManager.con.createStatement();
+            int updatedLines = stmt.executeUpdate(SQL);
+            if(updatedLines < 1){
+                System.out.println("[!] Update failed.");
+            }else{
+                System.out.println("Update auf Status in tab bestellung bei bestnr "+bestnr+" erfolgreich.\n");
+            }
+        }catch(SQLException e){
+            e.printStackTrace();
+        }
+    }
+
+    public static void setBoxenUsed(int lagerbestand_bstnr, int box_vbnr){
+        String SQL = "update box set vstat = 1, vbstnr = ? where vbnr = ?;";
+        PreparedStatement pstmt = null;
+
+        try{
+            pstmt = ConnectionManager.con.prepareStatement(SQL, Statement.RETURN_GENERATED_KEYS);
+        }catch(SQLException e){
+            e.printStackTrace();
+        }
+        try{
+            //fragezeichen aus pstmt ersetzen.
+            pstmt.setInt(1, lagerbestand_bstnr);
+            pstmt.setInt(2, box_vbnr);
+            int temp = pstmt.executeUpdate();
+            if(temp > 0){
+                System.out.println("\nerfolgreich eine zeile in box geupdated mit vbstnr = "+lagerbestand_bstnr+
+                        " wo box bestandsnummer = " + box_vbnr);
+            }
+        }catch(SQLException e){
+            System.out.println("[!!] Fehler beim Schreiben: " + e.getMessage());
+        }
+    }
 }
+
+
