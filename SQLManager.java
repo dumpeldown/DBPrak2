@@ -508,10 +508,10 @@ public class SQLManager{
         return bestellungen;
     }
 
-    public static String getVersandTyp(int bestnr){
+    public static String getVersandTyp(int artnr){
         Statement stmt;
         ResultSet rs = null;
-        String SQL = "select * from box where vbstnr ="+bestnr+";";
+        String SQL = "select ttyp from artikel where artnr ="+artnr+";";
         try{
             stmt = ConnectionManager.con.createStatement();
             rs = stmt.executeQuery(SQL);
@@ -519,12 +519,8 @@ public class SQLManager{
             e.printStackTrace();
         }
         try{
-            if(!rs.isBeforeFirst()){
-                System.out.println("\n[!!!]Kein Ergebnis in box fuer bestnr/vbstnr+"+bestnr+" gefunden.");
-            }
-            System.out.println("\nBestellung mit bestellnummer "+bestnr+" gefunden.");
             while(rs.next()){
-                return rs.getString("vbtyp");
+                return rs.getString("ttyp");
             }
         }catch(SQLException e){
             e.printStackTrace();

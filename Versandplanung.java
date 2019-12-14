@@ -2,7 +2,11 @@ import java.util.*;
 
 
 public class Versandplanung{
-    public static int[] freieBoxtype = new int[4];
+
+    public static int anzFreieOR = 0;
+    public static int anzFreieFR = 0;
+    public static int anzFreieWP = 0;
+    public static int anzFreieFW = 0;
 
     public static void plan(){
         LinkedList<Bpd> bpdispo = new LinkedList<>();
@@ -32,29 +36,37 @@ public class Versandplanung{
         lfBO= SQLManager.getFreieBoxen();
         lfBO = sortAndPrintFreie(lfBO);
 
-        ArrayList<Bpd> zuloeschen = new ArrayList<>();
-        System.out.println("Anzahl der elemente in bpdispo: "+bpdispo.size());
-        for(Bpd o: bpdispo){
-            if((o.algrad-1) > 100){
-                System.out.println("Position mit algrad > 100 wird verpackt.");
-                verpacken(lfBO, o, packliste);
-                zuloeschen.add(o);
-            }else{
-                System.out.println("position gefunden, wo algrad < 100, aber erstmal übersprungen.");
-            }
+        packBig(bpdispo, lfBO, packliste);
+        sortAndPackSmall(bpdispo, lfBO, packliste);
 
+
+        System.out.println("Anzahl der Elemente in Packliste: "+packliste.size());
+        if(packliste.size() == 0){
+            System.out.println("Keine Positionen aus Bestellung können verpackt werden.");
+            return;
+        }
+        for(Packelement pe: packliste){
+            pe.toPrint();
         }
 
-
-        for(Bpd o: zuloeschen){
-            bpdispo.remove(o);
+        SQLManager.writePackliste(packliste);
+        for(Packelement el : packliste){
+            SQLManager.setBoxenUsed(el.lagerbestand_bstnr, el.box_vbnr);
         }
-        zuloeschen.clear();
 
+        SQLManager.updateStatusOnBestellung(choice);
+        //Lieferschein.print(choice);
+
+    }
+
+    private static void sortAndPackSmall(LinkedList<Bpd> bpdispo, ArrayList<FreieBox> lfBO,
+                                    ArrayList<Packelement> packliste){
         ArrayList<Bpd> kleineor = new ArrayList<>();
         ArrayList<Bpd> kleinefr = new ArrayList<>();
         ArrayList<Bpd> kleinewp = new ArrayList<>();
         ArrayList<Bpd> kleinefw = new ArrayList<>();
+
+        ArrayList<Bpd> zuloeschen = new ArrayList<>();
 
 
         System.out.println("Anzahl der positionen mit algrad < 100: "+bpdispo.size());
@@ -88,46 +100,80 @@ public class Versandplanung{
         for(Bpd o: zuloeschen){
             bpdispo.remove(o);
         }
+        if(bpdispo.size() > 0){
+            System.out.println("ALARM, check in artikel ist falsch oder program falsch.");
+        }
 
         System.out.println("Anzahl der Position mit tyyp OR: "+kleineor.size());
         System.out.println("Anzahl der Position mit tyyp FR: "+kleinefr.size());
         System.out.println("Anzahl der Position mit tyyp WP: "+kleinewp.size());
         System.out.println("Anzahl der Position mit tyyp FW: "+kleinefw.size());
 
-        //TODO MUSS AUCH FÜR 2 BOXEN FUNKTIONIEREN; DIE BEIDE ALGRAD < 100 ABER NICHT ZSM IN EINE BOX.
-        //eventuell gefixt, ausprobieren.
+        //nach algrad sortieren
+        Collections.sort(kleineor);
+        Collections.sort(kleinefr);
+        Collections.sort(kleinefw);
+        Collections.sort(kleinewp);
 
+        int summe_or = 0, summe_fr = 0, summe_wp = 0, summe_fw = 0;
 
-        sortAndPack(kleineor, lfBO, packliste);
-        sortAndPack(kleinefr, lfBO, packliste);
-        sortAndPack(kleinefw, lfBO, packliste);
-        sortAndPack(kleinewp, lfBO, packliste);
-
-        System.out.println("elemente in packliste: "+packliste.size());
-        for(Packelement pe: packliste){
-            pe.toPrint();
+        for(Bpd o: kleineor){
+            summe_or += o.algrad;
+        }
+        for(Bpd o: kleinefr){
+            summe_fr += o.algrad;
+        }
+        for(Bpd o: kleinewp){
+            summe_wp += o.algrad;
+        }
+        for(Bpd o: kleinewp){
+            summe_wp += o.algrad;
         }
 
+        int anz_or = summe_or/100;
+        int anz_fr = summe_fr/100;
+        int anz_wp = summe_wp/100;
+        int anz_fw = summe_fw/100;
 
-        SQLManager.writePackliste(packliste);
-        for(Packelement el : packliste){
-            SQLManager.setBoxenUsed(el.lagerbestand_bstnr, el.box_vbnr);
-        }
 
-        SQLManager.updateStatusOnBestellung(choice);
-        //Lieferschein.print(choice);
+        //wirklich niemand will caffee und tastatur in eine kiste verpacken.
 
+        //TODO
+        //schleife, solange letzes obj rausnehmen --> in extra hochwertigere box speichern, summe neu berechnen, anz
+        // neu berechen, gucken ob genug boxen
+        // vorhanden sind--> wenn ja einfach verpacken, und einfach verpacken der extra liste
+        //soalnge machen, bis genug boxen von einem typ vorhanden sind.
+
+        packSmall(kleineor, lfBO, packliste);
+        packSmall(kleinefr, lfBO, packliste);
+        packSmall(kleinefw, lfBO, packliste);
+        packSmall(kleinewp, lfBO, packliste);
     }
 
-    public static void sortAndPack(ArrayList<Bpd> zuVersenden, ArrayList<FreieBox> lfBO,
+    private static void packBig(LinkedList<Bpd> bpdispo, ArrayList<FreieBox> lfBO, ArrayList<Packelement> packliste){
+        ArrayList<Bpd> zuloeschen = new ArrayList<>();
+        System.out.println("Anzahl der elemente in bpdispo: "+bpdispo.size());
+        for(Bpd o: bpdispo){
+            if((o.algrad-1) > 100){
+                System.out.println("Position mit algrad > 100 wird verpackt.");
+                verpacken(lfBO, o, packliste);
+                zuloeschen.add(o);
+            }
+        }
+
+        for(Bpd o: zuloeschen){
+            bpdispo.remove(o);
+        }
+    }
+
+    public static void packSmall(ArrayList<Bpd> zuVersenden, ArrayList<FreieBox> lfBO,
                                    ArrayList<Packelement> packliste){
         if(zuVersenden.size() == 0){
             return;
         }
-        Collections.sort(zuVersenden);
+
         do{
             int summe = 0;
-            int anzBox = 1;
             ArrayList<Bpd> zuverpacken = new ArrayList<>();
             for(Bpd obj_or : zuVersenden){
                 System.out.println("Checken auf summe der einzelnen positionen: summe = "+summe+" und algrad " +
@@ -138,7 +184,6 @@ public class Versandplanung{
                 }
                 else{
                     System.out.println("Das naechste obj kann nicht in die selbe box.");
-                    anzBox++;
                     break;
                 }
             }
@@ -157,7 +202,7 @@ public class Versandplanung{
             if(zuVersenden.size() == 0){
                 return;
             }
-        }while(!zuVersenden.isEmpty());
+        }while(true);
     }
 
 
@@ -179,24 +224,24 @@ public class Versandplanung{
         int i = 0;
         for(FreieBox fr : freie){
             if(ttyp.equals("OR")){
-                if(freieBoxtype[0] < 1){
+                if(anzFreieOR < 1){
                     System.out.println("boxtypsuche von or nach fr geändert, da keine or boxen mehr borhanden sind.");
                     ttyp = "FR";
                 }
             }if(ttyp.equals("FR")){
-                if(freieBoxtype[1] < 1){
+                if(anzFreieFR < 1){
                     System.out.println("boxtypsuche von fr nach wp geändert, da keine fr boxen mehr vorhanden sind.");
                     ttyp = "WP";
                 }
             }
             if(ttyp.equals("WP")){
-                if(freieBoxtype[2] < 1){
+                if(anzFreieWP < 1){
                     System.out.println("boxtypsuche von wp nach fw geändert, da keine wp boxen mehr vorhanden sind.");
                     ttyp = "FW";
                 }
             }
-            if(ttyp.equals("FR")){
-                if(freieBoxtype[3] < 1){
+            if(ttyp.equals("FW")){
+                if(anzFreieFW < 1){
                     System.out.println("ÜBERHAUPTKEINE FREIEN BOXEN MEHR. xD");
                     return;
                 }
@@ -216,33 +261,45 @@ public class Versandplanung{
         }
 
 
-        i = 0;
         System.out.println("Anzahl der bereitgestellten Boxen: "+notwendige.length+"!");
-        for(int j = 0; j < notwendige.length; j++){
-            if(notwendige[j].equals("OR")) freieBoxtype[0]--;
-            if(notwendige[j].equals("FR")) freieBoxtype[1]--;
-            if(notwendige[j].equals("WP")) freieBoxtype[2]--;
-            if(notwendige[j].equals("FW")) freieBoxtype[3]--;
+        for(FreieBox box: notwendige){
+            if(box.versandtyp.equals("OR")){
+                System.out.println("Anzahl der freien OR boxen wurde um 1 dekrementiert");
+                anzFreieOR--;
+            }
+            if(box.versandtyp.equals("FR")){
+                System.out.println("Anzahl der freien FR boxen wurde um 1 dekrementiert");
+                anzFreieFR--;
+            }
+            if(box.versandtyp.equals("WP")){
+                System.out.println("Anzahl der freien WP boxen wurde um 1 dekrementiert");
+                anzFreieWP--;
+            }
+            if(box.versandtyp.equals("FW")){
+                System.out.println("Anzahl der freien FW boxen wurde um 1 dekrementiert");
+                anzFreieFW--;
+            }
         }
 
         //jetzt sachen in box verpacken:
+        int index = 0;
         do{
             Packelement verpackt;
 
             if((zuVersenden.menge - zuVersenden.anzbo) > 0){
-                verpackt = new Packelement(zuVersenden.bstnr, notwendige[i].bestandnummer,
+                verpackt = new Packelement(zuVersenden.bstnr, notwendige[index].bestandnummer,
                         zuVersenden.anzbo);
                 zuVersenden.menge -= zuVersenden.anzbo;
             }else{
-                verpackt = new Packelement(zuVersenden.bstnr, notwendige[i].bestandnummer,
+                verpackt = new Packelement(zuVersenden.bstnr, notwendige[index].bestandnummer,
                         zuVersenden.menge);
             }
 
             zuVersenden.algrad -= 100;
 
-            freie.remove(notwendige[i]);
+            freie.remove(notwendige[index]);
             packliste.add(verpackt);
-            i++;
+            index++;
         }while(zuVersenden.algrad > 0);
     }
 
@@ -283,19 +340,16 @@ public class Versandplanung{
             if(o.versandtyp.equals("FR")){ fr.add(o);}
             if(o.versandtyp.equals("OR")){ or.add(o);}
         }
-        int anzFreieOR = or.size();
-        int anzFreieFR = fr.size();
-        int anzFreieWP = wp.size();
-        int anzFreieFW = fw.size();
+
+        anzFreieOR = or.size();
+        anzFreieFR = fr.size();
+        anzFreieWP = wp.size();
+        anzFreieFW = fw.size();
 
         System.out.println("Anzahl der freien Boxen vom Typ OR: "+anzFreieOR);
         System.out.println("Anzahl der freien Boxen vom Typ FR: "+anzFreieFR);
         System.out.println("Anzahl der freien Boxen vom Typ WP: "+anzFreieWP);
         System.out.println("Anzahl der freien Boxen vom Typ FW: "+anzFreieFW);
-        freieBoxtype[0] = anzFreieOR;
-        freieBoxtype[1] = anzFreieFR;
-        freieBoxtype[2] = anzFreieWP;
-        freieBoxtype[3] = anzFreieFW;
 
         for(FreieBox o: fw){
             o.toPrint();
@@ -310,18 +364,11 @@ public class Versandplanung{
             o.toPrint();
         }
 
-        for(FreieBox o: or){
-            alle.add(o);
-        }
-        for(FreieBox o: fr){
-            alle.add(o);
-        }
-        for(FreieBox o: wp){
-            alle.add(o);
-        }
-        for(FreieBox o: fw){
-            alle.add(o);
-        }
+        //jetzt sortiert nach Versandtyp
+        alle.addAll(or);
+        alle.addAll(fr);
+        alle.addAll(wp);
+        alle.addAll(fw);
         return alle;
     }
 
@@ -343,7 +390,7 @@ public class Versandplanung{
         //System.out.println("Anzahl der gefundenen bestellungen: "+bestellungen.size());
 
         for(int[] ia: bestellungen){
-            String ttyp = SQLManager.getVersandTyp(ia[1]);
+            String ttyp = SQLManager.getVersandTyp(ia[0]);
             String artbez = SQLManager.getArtikelBez(ia[0]);
             // anzbo gibt an, wie viel Prozent Platz ein Artikel in einer Box
             // einnimmt.
