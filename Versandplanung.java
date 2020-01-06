@@ -7,6 +7,8 @@ public class Versandplanung{
     public static int anzFreieFR = 0;
     public static int anzFreieWP = 0;
     public static int anzFreieFW = 0;
+    public static Map<Integer, String[]> andersVerpackt = new HashMap<>();
+
 
     public static void plan(){
         LinkedList<Bpd> bpdispo = new LinkedList<>();
@@ -22,8 +24,11 @@ public class Versandplanung{
             if(!SQLManager.isValid("lagerbestand", "bestnr", choice)){
                 System.out.println("Die ausgewählte Bestellnummer ist in der Lagerbestand-Tabelle nicht eingetragen.");
             }
+            if(SQLManager.bestellungIsVerpackt(choice)){
+                System.out.println("Die Bestellung mit der Bestellnr ist bereits verpackt.");
+            }
             if(choice == 0) return;
-        }while(!SQLManager.isValid("lagerbestand", "bestnr", choice) || choice == -1);
+        }while(!SQLManager.isValid("lagerbestand", "bestnr", choice) || choice == -1 || SQLManager.bestellungIsVerpackt(choice));
 
         voll = initList(choice);
 
@@ -115,25 +120,6 @@ public class Versandplanung{
         Collections.sort(kleinefw);
         Collections.sort(kleinewp);
 
-        int summe_or = 0, summe_fr = 0, summe_wp = 0, summe_fw = 0;
-
-        for(Bpd o: kleineor){
-            summe_or += o.algrad;
-        }
-        for(Bpd o: kleinefr){
-            summe_fr += o.algrad;
-        }
-        for(Bpd o: kleinewp){
-            summe_wp += o.algrad;
-        }
-        for(Bpd o: kleinewp){
-            summe_wp += o.algrad;
-        }
-
-        int anz_or = summe_or/100;
-        int anz_fr = summe_fr/100;
-        int anz_wp = summe_wp/100;
-        int anz_fw = summe_fw/100;
 
 
         //wirklich niemand will caffee und tastatur in eine kiste verpacken.
@@ -241,8 +227,10 @@ public class Versandplanung{
                 }
             }
             if(ttyp.equals("FW")){
-                if(anzFreieFW < 1){
-                    System.out.println("ÜBERHAUPTKEINE FREIEN BOXEN MEHR. xD");
+                if(anzFreieFW < notwendige.length){
+                    System.out.println("Die Anzahl der FW Boxen reicht nicht aus, um diese Position zu verpacken.");
+                    System.out.println("NNNNNNNNNNNNNNNNicht gepackt");
+                    andersVerpackt.put(zuVersenden.bstnr, new String[]{zuVersenden.artbez, zuVersenden.ttyp, ttyp});
                     return;
                 }
             }
@@ -254,9 +242,6 @@ public class Versandplanung{
                 System.out.println("Box mit richtigem Typ gefunden und in notwendige array hinzugefügt.");
                 notwendige[i] = fr;
                 i++;
-            }else{
-                System.out.println("FEHLER!!");
-                return;
             }
         }
 
@@ -285,7 +270,6 @@ public class Versandplanung{
         int index = 0;
         do{
             Packelement verpackt;
-
             if((zuVersenden.menge - zuVersenden.anzbo) > 0){
                 verpackt = new Packelement(zuVersenden.bstnr, notwendige[index].bestandnummer,
                         zuVersenden.anzbo);
@@ -297,6 +281,12 @@ public class Versandplanung{
 
             zuVersenden.algrad -= 100;
 
+            //Eintragen der Positionen, die nicht in der bestimmten versandverpackung versandt werden konnten.
+            if(!ttyp.equals(zuVersenden.ttyp)){
+                System.out.println("GGGGGGGGGGGGGGGGGGGepackt, aber falsch verpacken");
+                    andersVerpackt.put(zuVersenden.bstnr, new String[]{zuVersenden.artbez, zuVersenden.ttyp, ttyp});
+            }
+
             freie.remove(notwendige[index]);
             packliste.add(verpackt);
             index++;
@@ -307,13 +297,53 @@ public class Versandplanung{
                                          ArrayList<Packelement> packliste){
 
         FreieBox versandbox = null;
+        int freieOR = 0, freieFR= 0, freieWP= 0, freieFW= 0;
+        for(FreieBox fr: freie){
+            if(fr.versandtyp.equals("OR")) freieOR++;
+            if(fr.versandtyp.equals("FR")) freieFR++;
+            if(fr.versandtyp.equals("WP")) freieWP++;
+            if(fr.versandtyp.equals("FW")) freieFW++;
+        }
+        System.out.println("freie OR Boxen:"+ freieOR);
+        System.out.println("freie FR Boxen:"+ freieFR);
+        System.out.println("freie WP Boxen:"+ freieWP);
+        System.out.println("freie FW Boxen:"+ freieFW);
+
+
         String ttyp = zuVersenden.get(0).ttyp;
+        if(ttyp.equals("OR") && freieOR == 0){
+            System.out.println("[!!]Versandtyp von OR nach FR geändert.");
+            ttyp = "FR";
+        }
+        if(ttyp.equals("FR") && freieFR == 0){
+            System.out.println("[!!]Versandtyp von FR nach WP geändert.");
+            ttyp = "WP";
+        }
+        if(ttyp.equals("WP") && freieWP == 0){
+            System.out.println("[!!]Versandtyp von WP nach FW geändert.");
+            ttyp = "FW";
+        }
+        if(ttyp.equals("FW") && freieFW == 0){
+            System.out.println("[!!] Die Position kann nicht versendet werden, da keine passende Box gefunden werden " +
+                    "konnte.");
+            for(Bpd a : zuVersenden){
+                System.out.println("KKKKKKKKKKKKKKKKKKeine passende Box");
+                andersVerpackt.put(a.bstnr, new String[]{a.artbez, a.ttyp, ttyp});
+            }
+            return;
+        }
+        //Eintragen der Positionen, die nicht in der bestimmten versandverpackung versandt werden konnten.
+        if(!ttyp.equals(zuVersenden.get(0).ttyp)){
+            for(Bpd a : zuVersenden){
+                System.out.println("GGGGGGGGGGGGGGGGGGGepackt, aber falsch VerpackenEinfach");
+                andersVerpackt.put(a.bstnr, new String[]{a.artbez, a.ttyp, ttyp});
+            }
+        }
         for(FreieBox fr : freie){
             if(ttyp.equals(fr.versandtyp)){
+                System.out.println("Eine passende Versandbox gefunden.");
                 versandbox = fr;
                 break;
-            }else{
-                //TODO Auf andere Versandbox typen ausweichen, die auch genommen weden können.
             }
         }
 
@@ -423,7 +453,6 @@ public class Versandplanung{
         ArrayList<Bpd> listWP = new ArrayList<>();
         ArrayList<Bpd> listFW = new ArrayList<>();
         for(Bpd o: bpdispo){
-            //TODO ausprobieren von sortieren nach ttyp!
 
             System.out.println("\nein objekt wird ttyp-liste hinzugefügt.");
             //je nach ttyp der liste zufügen

@@ -25,6 +25,27 @@ public class SQLManager{
         return false;
     }
 
+    public static boolean isBestellungVerpackt(int bestnr){
+        Statement stmt;
+        ResultSet rs = null;
+        String SQL = "Select * from bestellung where status = 2 and bestnr ="+bestnr;
+        try{
+            stmt = ConnectionManager.con.createStatement();
+            rs = stmt.executeQuery(SQL);
+        }catch(SQLException e){
+            e.printStackTrace();
+        }
+        //überprüfen, ob das Resultset Zeilen enthält. wenn ja, ist es eine valide Knr.
+        try{
+            if(rs.isBeforeFirst()){
+                return true;
+            }
+        }catch(SQLException e){
+            e.printStackTrace();
+        }
+        return false;
+    }
+
     /**
      * Die funktionen schreibt die einzelnen kunde als neue kunden ins System, falls diese dort noch nicht existieren.
      *
@@ -230,6 +251,22 @@ public class SQLManager{
         }
         String SQL = "update lagerbestand set wert = artikel.preis * lagerbestand.stuecke from artikel where artikel" +
                 ".artnr ="+updateArtnr+" and artikel.artnr = lagerbestand.artnr";
+        try{
+            stmt = ConnectionManager.con.createStatement();
+            int updatedLines = stmt.executeUpdate(SQL);
+            if(updatedLines < 1){
+                System.out.println("[!] Update failed.");
+            }else{
+                System.out.println("Update auf WERT erfolgreich.\n");
+            }
+        }catch(SQLException e){
+            e.printStackTrace();
+        }
+    }
+    public static void updateAlleWerte(){
+        Statement stmt;
+
+        String SQL = "update lagerbestand set wert = artikel.preis * lagerbestand.stuecke from artikel where artikel.artnr = lagerbestand.artnr";
         try{
             stmt = ConnectionManager.con.createStatement();
             int updatedLines = stmt.executeUpdate(SQL);
@@ -622,6 +659,125 @@ public class SQLManager{
         }catch(SQLException e){
             System.out.println("[!!] Fehler beim Schreiben: " + e.getMessage());
         }
+    }
+
+    public static ResultSet getKundeFromBestnr(int bestnr) {
+        Statement stmt;
+        ResultSet rs = null;
+        String SQL = "select knr, kname, plz, ort, strasse from kunde " +
+                "where knr = (select knr from bestellung where bestnr ="+bestnr+")";
+        try{
+            stmt = ConnectionManager.con.createStatement();
+            rs = stmt.executeQuery(SQL);
+        }catch(SQLException e){
+            e.printStackTrace();
+        }
+        return rs;
+    }
+
+    public static ResultSet getLagerbeste(int bestnr) {
+        updateAlleWerte();
+        Statement stmt;
+        ResultSet rs = null;
+        String SQL = "select * from lagerbestand where bestnr ="+bestnr+";";
+        try{
+            stmt = ConnectionManager.con.createStatement();
+            rs = stmt.executeQuery(SQL);
+        }catch(SQLException e){
+            e.printStackTrace();
+        }
+        return rs;
+    }
+    public static boolean bestellungIsVerpackt(int bestnr){
+        Statement stmt;
+        ResultSet rs = null;
+        String SQL = "Select * from bestellung where status = 2 and bestnr = "+bestnr;
+        try{
+            stmt = ConnectionManager.con.createStatement();
+            rs = stmt.executeQuery(SQL);
+        }catch(SQLException e){
+            e.printStackTrace();
+        }
+        //überprüfen, ob das Resultset Zeilen enthält. wenn ja, ist es eine valide Knr.
+        try{
+            if(rs.isBeforeFirst()){
+                return true;
+            }
+        }catch(SQLException e){
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    public static java.sql.Date getBestellDatum(int bestnr) {
+        Statement stmt;
+        ResultSet rs = null;
+        String SQL = "select bestdat from bestellung where bestnr ="+bestnr+";";
+        try{
+            stmt = ConnectionManager.con.createStatement();
+            rs = stmt.executeQuery(SQL);
+        }catch(SQLException e){
+            e.printStackTrace();
+        }
+        try {
+            while(rs.next()) {
+                return rs.getDate("bestdat");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        System.out.println("Fuer lieferschein daatum nicht richtig geholt.");
+        return null;
+    }
+
+    public static ArrayList<String> getBoxenByBestellnr(int bestnr) {
+        Statement stmt;
+        ResultSet rs = null;
+        ArrayList<String> versandtypen = new ArrayList<>();
+        ArrayList<Integer> bstnr = getBestandsnr(bestnr);
+        for(int nr: bstnr){
+            String SQL = "select vbtyp from box where vbstnr = "+nr+" ;";
+            try{
+                stmt = ConnectionManager.con.createStatement();
+                rs = stmt.executeQuery(SQL);
+            }catch(SQLException e){
+                e.printStackTrace();
+            }
+            try {
+                while(rs.next()) {
+                    versandtypen.add(rs.getString("vbtyp"));
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+                System.out.println("Fuer lieferschein boxtyp/en nicht richtig geholt..");
+            }
+        }
+
+
+        return versandtypen;
+    }
+
+    private static ArrayList<Integer> getBestandsnr(int bestnr){
+        Statement stmt;
+        ResultSet rs = null;
+        ArrayList<Integer> bstnr= new ArrayList<>();
+        String SQL = "select bstnr from lagerbestand where bestnr = "+bestnr+" ;";
+        try{
+            stmt = ConnectionManager.con.createStatement();
+            rs = stmt.executeQuery(SQL);
+        }catch(SQLException e){
+            e.printStackTrace();
+        }
+        try {
+            while(rs.next()) {
+                bstnr.add(rs.getInt("bstnr"));
+            }
+        } catch (SQLException e) {
+            System.out.println("Fuer lieferschein bestandsnummern nicht richtig geholt..");
+            e.printStackTrace();
+        }
+
+        return bstnr;
     }
 }
 
