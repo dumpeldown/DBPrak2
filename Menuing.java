@@ -47,6 +47,10 @@ public class Menuing{
                     Versandplanung.plan();
                     break;
                 }
+                case 10:{
+                    Lieferschein.initLieferschein();
+                    break;
+                }
                 case 0:{
                     System.out.println("Programm wird beendet.");
                     ConnectionManager.closeConnection();
@@ -68,6 +72,7 @@ public class Menuing{
                 "7) Fuer eine ArtNr. den Artikel anzeigen und seine Lagerbestaende.\n" +
                 "8) Eine neue Bestellung ins System aufnehmen.\n" +
                 "9) Prak3: Versandplanung starten!\n"+
+                "10) Prak3: Lieferschein erstellen\n"+
                 "0) Verbindung trennen und Program schließen.");
     }
 }
